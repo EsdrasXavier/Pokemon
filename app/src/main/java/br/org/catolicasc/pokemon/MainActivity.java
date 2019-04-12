@@ -1,12 +1,19 @@
 package br.org.catolicasc.pokemon;
 
+import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -15,6 +22,9 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.sql.Array;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Random;
 
 import org.json.JSONObject;
@@ -23,66 +33,200 @@ import org.json.JSONArray;
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
 
-    private JSONObject  pokemonJson;
+    private Button option1;
+    private Button option2;
+    private Button option3;
+    private Button option4;
+    private TextView hitAndMiss;
     private ImageView imageView;
+    private ProgressBar progressBar;
+    private ArrayList<Pokemon> pokemonList = new ArrayList<Pokemon>();
+    private int hits;
+    private int misses;
+    private AlertDialog alert;
+
+    protected String rightPokemonName;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        readJson();
 
 
+        option1 = findViewById(R.id.option1);
+        option2 = findViewById(R.id.option2);
+        option3 = findViewById(R.id.option3);
+        option4 = findViewById(R.id.option4);
+        hitAndMiss = findViewById(R.id.hitAndMiss);
+        progressBar = findViewById(R.id.progressBar2);
 
+
+        // Try get the data from web
         try {
-            System.out.println(pokemonJson.getJSONArray("pokemon"));
+            JSONObject pokemonJson = readJson("https://raw.githubusercontent.com/Biuni/PokemonGO-Pokedex/master/pokedex.json");
             JSONArray list = pokemonJson.getJSONArray("pokemon");
-            System.out.println(list.length());
-            Random num = new Random();
-            int nAleatorio = num.nextInt(list.length());
-            JSONObject jsonLineItem = (JSONObject) list.get(nAleatorio);
-            String imgUrl = jsonLineItem.getString("img");
-            System.out.println(imgUrl);
+            JSONObject jsonLineItem;
+            String name, imgUrl;
+            int id, num;
 
-
-            imageView = findViewById(R.id.imageView);
-
-            ImageDownloader imageDownloader = new ImageDownloader();
-
-            imgUrl = imgUrl.replace("http", "https");
-            try {
-                // baixar a imagem da internet
-                Bitmap imagem = imageDownloader.execute(imgUrl).get();
-                // atribuir a imagem ao imageView
-                imageView.setImageBitmap(imagem);
-            } catch (Exception e) {
-                Log.e(TAG, "downloadImagem: Impossível baixar imagem"
-                        + e.getMessage());
+            for (int i = 0; i < list.length(); i++) {
+                jsonLineItem = (JSONObject) list.get(i);
+                id = jsonLineItem.getInt("id");
+                num = jsonLineItem.getInt("num");
+                name = jsonLineItem.getString("name");
+                imgUrl = jsonLineItem.getString("img");
+                pokemonList.add(new Pokemon(id, num, name, imgUrl));
             }
-
         } catch (Exception e) {
             Log.e(TAG, e.getMessage());
         }
-
-
+        getNewPokemon();
     }
 
-    private void readJson() {
-        String url = "https://raw.githubusercontent.com/Biuni/PokemonGO-Pokedex/master/pokedex.json";
+    private void showAlert(String title, String msg) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(title);
+        builder.setMessage(msg);
+
+        builder.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface arg0, int arg1) {
+                Toast.makeText(MainActivity.this, "Reiniciando o game", Toast.LENGTH_SHORT).show();
+                hits = 0;
+                updateScore();
+                getNewPokemon();
+            }
+        });
+        alert = builder.create();
+        alert.show();
+    }
+
+    private boolean checkForRightPokemon(String name, String rightName) {
+        return name.equals(rightName);
+    }
+
+    private void updateScore() {
+        String txt = "Acertos: " + hits + "  Erros: " + misses;
+        hitAndMiss.setText(txt);
+    }
+
+    private void getNewPokemon() {
+
+        imageView = findViewById(R.id.imageView);
+
+        String imgUrl="", name="";
+        int nAleatorio = 0;
+
+        Random num = new Random();
+        nAleatorio = num.nextInt(pokemonList.size());
+        imgUrl = pokemonList.get(nAleatorio).getImgUrl();
+        rightPokemonName = name = pokemonList.get(nAleatorio).getName();
+
+        ImageDownloader imageDownloader = new ImageDownloader();
+        imgUrl = imgUrl.replace("http", "https"); // Replace to avoid error
+
+        try {
+            Bitmap imagem = imageDownloader.execute(imgUrl).get();
+            imageView.setImageBitmap(imagem);
+        } catch (Exception e) {
+            Log.e(TAG, "downloadImagem: Impossível baixar imagem"
+                    + e.getMessage());
+        }
+
+
+        View.OnClickListener listenerForRightChoice = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Button b = (Button) v;
+                String buttonValue = b.getText().toString();
+                if (checkForRightPokemon(buttonValue, rightPokemonName)) {
+                    hits++;
+                    updateScore();
+                    getNewPokemon();
+                } else {
+                    misses++;
+                    String title = "Errou!";
+                    String msg = "Você errou o nome do pokemon. O nome correto era: " + rightPokemonName + ".";
+                    msg += " Total de acertos: " + hits;
+                    showAlert(title, msg);
+                }
+            }
+        };
+
+        option1.setOnClickListener(listenerForRightChoice);
+        option2.setOnClickListener(listenerForRightChoice);
+        option3.setOnClickListener(listenerForRightChoice);
+        option4.setOnClickListener(listenerForRightChoice);
+
+
+        int filled=0, randonPok, randonBut;
+        Boolean[] done = new Boolean[4];
+        Arrays.fill(done, Boolean.FALSE);
+        String rightName = name;
+
+        while (filled < 4) {
+            nAleatorio = num.nextInt(4);
+            randonBut = num.nextInt(4);
+            randonPok = num.nextInt(pokemonList.size());
+            name = pokemonList.get(randonPok).getName();
+
+            if (done[nAleatorio] == true) continue; // In case already filled
+
+            if (randonBut == nAleatorio && rightName != "") {
+                name = rightName;
+                rightName = "";
+            }
+
+            if (filled == 3 && filled < 4 && rightName != "") {
+                for (int i = 0; i < 4; i++) {
+                    if (done[i] == false) nAleatorio = i;
+                }
+                name = rightName;
+                rightName = "";
+            }
+
+
+            if (nAleatorio == 0 && !done[0]) {
+                option1.setText(name);
+                done[0] = true;
+                filled++;
+            } else if (nAleatorio == 1 && !done[1]) {
+                option2.setText(name);
+                done[1] = true;
+                filled++;
+            } else if (nAleatorio == 2 && !done[2]) {
+                option3.setText(name);
+                done[2] = true;
+                filled++;
+            } else if (nAleatorio == 3 && !done[3]) {
+                option4.setText(name);
+                done[3] = true;
+                filled++;
+            }
+        }
+    }
+
+    private JSONObject readJson(String url) {
         JsonTask readPokemon = new JsonTask();
 
         try {
             String data = readPokemon.execute(url).get();
-            pokemonJson = new JSONObject(data);
-//            J
-//            System.out.println(pokemonJson);
+            JSONObject pokemonJson = new JSONObject(data);
+            return pokemonJson;
         } catch (Exception e) {
             Log.e(TAG, "readJson: Erro buscar json: " + e.getMessage());
         }
+
+        return null;
     }
 
 
     private class ImageDownloader extends AsyncTask<String, Void, Bitmap> {
+
+        protected void onPreExecute() {
+            super.onPreExecute();
+            progressBar.setVisibility(View.VISIBLE);
+        }
+
         @Override
         protected Bitmap doInBackground(String... strings) {
 
@@ -102,13 +246,19 @@ public class MainActivity extends AppCompatActivity {
 
             return null;
         }
+
+        @Override
+        protected void onPostExecute(Bitmap result) {
+            super.onPostExecute(result);
+            progressBar.setVisibility(View.INVISIBLE);
+        }
     }
 
     private class JsonTask extends AsyncTask<String, String, String> {
 
         protected void onPreExecute() {
             super.onPreExecute();
-            System.out.println("Aguarde...");
+            progressBar.setVisibility(View.VISIBLE);
         }
 
         protected String doInBackground(String... params) {
@@ -121,7 +271,6 @@ public class MainActivity extends AppCompatActivity {
                 connection = (HttpURLConnection) url.openConnection();
                 connection.connect();
 
-
                 InputStream stream = connection.getInputStream();
 
                 reader = new BufferedReader(new InputStreamReader(stream));
@@ -129,11 +278,7 @@ public class MainActivity extends AppCompatActivity {
                 StringBuffer buffer = new StringBuffer();
                 String line = "";
 
-                while ((line = reader.readLine()) != null) {
-                    buffer.append(line+"\n");
-//                    Log.d("Response: ", "> " + line);   //here u ll get whole response...... :-)
-
-                }
+                while ((line = reader.readLine()) != null) buffer.append(line+"\n");
 
                 return buffer.toString();
 
@@ -159,7 +304,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute(String result) {
             super.onPostExecute(result);
-//            System.out.println(result);
+            progressBar.setVisibility(View.INVISIBLE);
         }
     }
 }
