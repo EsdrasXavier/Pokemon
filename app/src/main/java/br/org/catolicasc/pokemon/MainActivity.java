@@ -3,6 +3,7 @@ package br.org.catolicasc.pokemon;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.os.AsyncTask;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -22,9 +23,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.sql.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.Random;
 
 import org.json.JSONObject;
@@ -40,10 +40,13 @@ public class MainActivity extends AppCompatActivity {
     private TextView hitAndMiss;
     private ImageView imageView;
     private ProgressBar progressBar;
+    private AlertDialog alert;
+
+
     private ArrayList<Pokemon> pokemonList = new ArrayList<Pokemon>();
     private int hits;
     private int misses;
-    private AlertDialog alert;
+
 
     protected String rightPokemonName;
 
@@ -126,7 +129,11 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             Bitmap imagem = imageDownloader.execute(imgUrl).get();
-            imageView.setImageBitmap(imagem);
+            int nh = (int) ( imagem.getHeight() * (512.0 / imagem.getWidth()) );
+            Bitmap scaled = Bitmap.createScaledBitmap(imagem, 480, nh, true);
+            imageView.setImageBitmap(scaled);
+//            imageView.setImageBitmap(imagem);
+//            imageView.setBackgroundColor(Color.rgb(100, 100, 50));
         } catch (Exception e) {
             Log.e(TAG, "downloadImagem: Impossível baixar imagem"
                     + e.getMessage());
@@ -158,51 +165,21 @@ public class MainActivity extends AppCompatActivity {
         option4.setOnClickListener(listenerForRightChoice);
 
 
-        int filled=0, randonPok, randonBut;
-        Boolean[] done = new Boolean[4];
-        Arrays.fill(done, Boolean.FALSE);
-        String rightName = name;
+        ArrayList<Pokemon> list = new ArrayList<Pokemon>(4);
+        list.add(pokemonList.get(nAleatorio)); // Add o primeiro q é o certo
 
-        while (filled < 4) {
-            nAleatorio = num.nextInt(4);
-            randonBut = num.nextInt(4);
-            randonPok = num.nextInt(pokemonList.size());
-            name = pokemonList.get(randonPok).getName();
-
-            if (done[nAleatorio] == true) continue; // In case already filled
-
-            if (randonBut == nAleatorio && rightName != "") {
-                name = rightName;
-                rightName = "";
-            }
-
-            if (filled == 3 && filled < 4 && rightName != "") {
-                for (int i = 0; i < 4; i++) {
-                    if (done[i] == false) nAleatorio = i;
-                }
-                name = rightName;
-                rightName = "";
-            }
-
-
-            if (nAleatorio == 0 && !done[0]) {
-                option1.setText(name);
-                done[0] = true;
-                filled++;
-            } else if (nAleatorio == 1 && !done[1]) {
-                option2.setText(name);
-                done[1] = true;
-                filled++;
-            } else if (nAleatorio == 2 && !done[2]) {
-                option3.setText(name);
-                done[2] = true;
-                filled++;
-            } else if (nAleatorio == 3 && !done[3]) {
-                option4.setText(name);
-                done[3] = true;
-                filled++;
-            }
+        for (int i = 0; i < 3; i++) {
+            nAleatorio = num.nextInt(pokemonList.size());
+            list.add(pokemonList.get(nAleatorio));
         }
+
+        Collections.shuffle(list);
+
+        option1.setText(list.get(0).getName());
+        option2.setText(list.get(1).getName());
+        option3.setText(list.get(2).getName());
+        option4.setText(list.get(3).getName());
+
     }
 
     private JSONObject readJson(String url) {
