@@ -64,6 +64,33 @@ public class MainActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.progressBar2);
 
 
+        View.OnClickListener listenerForRightChoice = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Button b = (Button) v;
+                String buttonValue = b.getText().toString();
+                if (checkForRightPokemon(buttonValue, rightPokemonName)) {
+                    hits++;
+                    updateScore();
+                    getNewPokemon();
+                } else {
+                    misses++;
+                    String title = "Errou!";
+                    String msg = "Você errou o nome do pokemon. O nome correto era: " + rightPokemonName + ".";
+                    msg += " Total de acertos: " + hits;
+                    showAlert(title, msg);
+                }
+            }
+        };
+
+        option1.setOnClickListener(listenerForRightChoice);
+        option2.setOnClickListener(listenerForRightChoice);
+        option3.setOnClickListener(listenerForRightChoice);
+        option4.setOnClickListener(listenerForRightChoice);
+
+
+
+
         // Try get the data from web
         try {
             JSONObject pokemonJson = readJson("https://raw.githubusercontent.com/Biuni/PokemonGO-Pokedex/master/pokedex.json");
@@ -116,61 +143,38 @@ public class MainActivity extends AppCompatActivity {
 
         imageView = findViewById(R.id.imageView);
 
-        String imgUrl="", name="";
+        String imgUrl="";
         int nAleatorio = 0;
 
         Random num = new Random();
         nAleatorio = num.nextInt(pokemonList.size());
         imgUrl = pokemonList.get(nAleatorio).getImgUrl();
-        rightPokemonName = name = pokemonList.get(nAleatorio).getName();
+        rightPokemonName = pokemonList.get(nAleatorio).getName();
 
         ImageDownloader imageDownloader = new ImageDownloader();
-        imgUrl = imgUrl.replace("http", "https"); // Replace to avoid error
 
         try {
             Bitmap imagem = imageDownloader.execute(imgUrl).get();
             int nh = (int) ( imagem.getHeight() * (512.0 / imagem.getWidth()) );
             Bitmap scaled = Bitmap.createScaledBitmap(imagem, 480, nh, true);
             imageView.setImageBitmap(scaled);
-//            imageView.setImageBitmap(imagem);
-//            imageView.setBackgroundColor(Color.rgb(100, 100, 50));
         } catch (Exception e) {
             Log.e(TAG, "downloadImagem: Impossível baixar imagem"
                     + e.getMessage());
         }
 
-
-        View.OnClickListener listenerForRightChoice = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Button b = (Button) v;
-                String buttonValue = b.getText().toString();
-                if (checkForRightPokemon(buttonValue, rightPokemonName)) {
-                    hits++;
-                    updateScore();
-                    getNewPokemon();
-                } else {
-                    misses++;
-                    String title = "Errou!";
-                    String msg = "Você errou o nome do pokemon. O nome correto era: " + rightPokemonName + ".";
-                    msg += " Total de acertos: " + hits;
-                    showAlert(title, msg);
-                }
-            }
-        };
-
-        option1.setOnClickListener(listenerForRightChoice);
-        option2.setOnClickListener(listenerForRightChoice);
-        option3.setOnClickListener(listenerForRightChoice);
-        option4.setOnClickListener(listenerForRightChoice);
-
-
         ArrayList<Pokemon> list = new ArrayList<Pokemon>(4);
         list.add(pokemonList.get(nAleatorio)); // Add o primeiro q é o certo
 
-        for (int i = 0; i < 3; i++) {
+        Pokemon poke;
+        int i = 0;
+        while (i < 3) {
             nAleatorio = num.nextInt(pokemonList.size());
-            list.add(pokemonList.get(nAleatorio));
+            poke = pokemonList.get(nAleatorio);
+            if (list.contains(poke)) continue;
+
+            list.add(poke);
+            i++;
         }
 
         Collections.shuffle(list);
@@ -211,7 +215,17 @@ public class MainActivity extends AppCompatActivity {
                 URL url = new URL(strings[0]);
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                 connection.connect();
+                int resposta = connection.getResponseCode();
 
+                if (resposta != HttpURLConnection.HTTP_OK) { // se resposta não foi OK
+                    if (resposta == HttpURLConnection.HTTP_MOVED_TEMP  // se for um redirect
+                            || resposta == HttpURLConnection.HTTP_MOVED_PERM
+                            || resposta == HttpURLConnection.HTTP_SEE_OTHER) {
+                        // pegamos a nova URL e abrimos nova conexão!
+                        String novaUrl = connection.getHeaderField("Location");
+                        connection = (HttpURLConnection) new URL(novaUrl).openConnection();
+                    }
+                }
                 InputStream inputStream = connection.getInputStream();
                 Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
 
